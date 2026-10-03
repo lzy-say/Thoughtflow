@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>今日流水 · 自动归类</title>
+<style>
+  :root{
+    --bg:#f4f5f7;
+    --panel:#ffffff;
+    --line:#e4e6ea;
+    --line-strong:#d2d6dd;
+    --text:#1f2328;
+    --text-2:#3d444e;
+    --muted:#5f6874;
+    --accent:#2f6fed;
+    --accent-ink:#1b4fbf;
+    --ok:#1c6f47;
+    --err:#a8322d;
+    --radius:12px;
+    --shadow-1:0 1px 2px rgba(18,25,38,.05);
+    --shadow-2:0 6px 18px -6px rgba(16,24,40,.16);
+    --ease-out:cubic-bezier(.16,1,.3,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    font-size:13.5px; line-height:1.6;
+    caret-color:var(--accent);
+    -webkit-text-size-adjust:100%;
+  }
+  ::selection{background:#d7e5ff;color:#0f2144}
+  html{scrollbar-width:thin;scrollbar-color:#cbd1d9 transparent}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#cbd1d9;border:3px solid transparent;background-clip:padding-box;border-radius:99px}
+  ::-webkit-scrollbar-thumb:hover{background:#b2b9c3;border:3px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-corner{background:transparent}
+
+  button{font-family:inherit;font-size:12.5px;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel);color:var(--text);border-radius:9px;padding:6px 11px;white-space:nowrap;
+    display:inline-flex;align-items:center;gap:6px;justify-content:center;
+    transition:background .14s var(--ease-out),border-color .14s var(--ease-out),color .14s var(--ease-out)}
+  button:hover{border-color:var(--line-strong);background:#fafbfc}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+  button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+  button.ghost:hover{background:#eceef1;color:var(--text)}
+  :focus{outline:none}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+  svg.i{width:15px;height:15px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.9;
+    stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+  svg.i.lg{width:17px;height:17px}
+  svg.i.sm{width:13px;height:13px;stroke-width:2.1}
+
+  .app{max-width:1180px;margin:0 auto;padding:20px 22px 64px}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .brand{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .brand small{font-weight:400;color:var(--muted);font-size:12px;margin-left:2px}
+  .spacer{flex:1}
+  .date-nav{display:flex;align-items:center;gap:2px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:2px}
+  .date-nav .label{min-width:176px;text-align:center;font-variant-numeric:tabular-nums;
+    font-weight:500;font-size:12.5px;color:var(--text-2)}
+  .date-nav button{border-color:transparent;padding:5px 8px;color:var(--muted)}
+  .date-nav button:hover{background:#f2f4f7;color:var(--text)}
+  .date-nav button.ghost{border-radius:8px}
+  .view-switch{display:flex;background:#e9ebef;border-radius:10px;padding:2px;gap:2px}
+  .view-switch button{border:0;background:transparent;border-radius:8px;padding:5px 12px;color:var(--muted);
+    font-size:12.5px}
+  .view-switch button:hover{background:transparent;color:var(--text)}
+  .view-switch button.active{background:var(--panel);color:var(--text);font-weight:600;box-shadow:var(--shadow-1)}
+
+  /* ---------- 同步状态 ---------- */
+  #syncBtn.off{color:var(--muted)}
+  #syncBtn.ok{color:var(--ok);border-color:#bfe0cd}
+  #syncBtn.error{color:var(--err);border-color:#e8c3c1}
+  #syncBtn.syncing{color:var(--accent)}
+  #syncBtn.syncing svg.i{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---------- 输入区 ---------- */
+  .composer{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 13px;display:flex;gap:12px;align-items:flex-start;transition:box-shadow .18s var(--ease-out),border-color .18s var(--ease-out)}
+  .composer:focus-within{border-color:var(--line-strong);box-shadow:var(--shadow-2)}
+  .composer textarea{flex:1;border:0;outline:0;resize:vertical;min-height:44px;max-height:220px;
+    font-family:inherit;font-size:16px;line-height:1.65;background:transparent;color:var(--text)}
+  .composer textarea::placeholder{color:#6b7280}
+  .composer .side{display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:0}
+  .ai-state{font-size:11.5px;color:var(--muted);min-height:1em;max-width:100%;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .hint{color:var(--muted);font-size:11.5px;margin:8px 2px 20px;display:flex;gap:16px;flex-wrap:wrap}
+  .hint kbd{background:#eceef1;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;
+    padding:0 5px;font-size:10.5px;font-family:inherit;color:var(--text-2)}
+
+  /* ---------- 统计行 ---------- */
+  .stats{display:flex;align-items:center;gap:6px 18px;flex-wrap:wrap;margin:0 0 18px;
+    font-size:12.5px;color:var(--muted);row-gap:8px}
+  .stats:empty{display:none}
+  .stat-block{display:inline-flex;align-items:baseline;gap:4px}
+  .stat-block b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+  .cat-chips{display:inline-flex;flex-wrap:wrap;gap:4px 16px}
+  .cat-chip{display:inline-flex;align-items:center;gap:6px;color:var(--text-2);font-variant-numeric:tabular-nums}
+  .cat-chip b{font-weight:600;color:var(--text)}
+  .swatch{width:6px;height:6px;border-radius:50%;flex:0 0 auto;display:inline-block}
+
+  /* ---------- 小结 ---------- */
+  #summaryBox:empty{display:none}
+  .summary{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:18px}
+  .summary-head{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--text-2)}
+  .summary-head .spacer{flex:1}
+  .summary-head svg.i{color:var(--muted)}
+  .summary-body{margin-top:9px;font-size:14.5px;line-height:1.7;max-width:68ch;white-space:pre-wrap}
+  .summary-body.empty{color:var(--muted);font-size:12.5px;max-width:60ch}
+  .summary-meta{margin-top:9px;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* ---------- 看板 ---------- */
+  .board{display:flex;gap:10px;align-items:flex-start;overflow-x:auto;padding-bottom:10px}
+  .col{flex:0 0 232px;min-height:96px}
+  .col.dragover .col-body{background:#eff4ff;border-radius:10px;box-shadow:inset 0 0 0 1px #bcd2ff}
+  .col-head{display:flex;align-items:center;gap:7px;padding:0 2px 8px;font-size:12.5px;font-weight:600;
+    color:var(--text-2);border-bottom:1px solid var(--line)}
+  .col-head .count{margin-left:auto;color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums}
+  .col-body{display:flex;flex-direction:column;gap:7px;min-height:24px;padding-top:10px}
+  .empty{color:#8b929d;font-size:11.5px;padding:6px 2px}
+  .col .empty{text-align:left}
+
+  /* ---------- 卡片 ---------- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+    cursor:grab;box-shadow:var(--shadow-1);
+    transition:border-color .16s var(--ease-out),box-shadow .16s var(--ease-out)}
+  .card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-2)}
+  .card:active{cursor:grabbing}
+  .card.dragging{opacity:.4}
+  .card .txt{white-space:pre-wrap;word-break:break-word}
+  .card .meta{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px;color:var(--muted);
+    font-variant-numeric:tabular-nums;flex-wrap:wrap}
+  .card .src{color:var(--muted)}
+  .card .ops{margin-left:auto;display:flex;gap:1px;opacity:0;transition:opacity .16s var(--ease-out)}
+  .card:hover .ops,.card:focus-within .ops{opacity:1}
+  .card .ops button{padding:3px 5px;color:var(--muted);border-color:transparent;background:transparent;border-radius:6px}
+  .card .ops button:hover{background:#eceef1;color:var(--text)}
+  .card.done .txt{text-decoration:line-through;text-decoration-color:#c3c7ce;text-decoration-thickness:1px}
+  .card.doing{border-style:dashed}
+  .card.dropped{opacity:.55}
+
+  @keyframes card-land{
+    from{opacity:0;transform:translateY(-5px);filter:blur(2.5px)}
+    to{opacity:1;transform:none;filter:blur(0)}
+  }
+  .card.fresh{animation:card-land .44s var(--ease-out) both}
+
+  /* ---------- 时间线 ---------- */
+  .timeline{display:flex;flex-direction:column}
+  .tl-row{display:flex;gap:14px}
+  .tl-time{flex:0 0 46px;text-align:right;color:var(--muted);font-size:11.5px;
+    font-variant-numeric:tabular-nums;padding-top:9px}
+  .tl-line{flex:0 0 14px;position:relative}
+  .tl-line::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:1px;background:var(--line)}
+  .tl-line::after{content:"";position:absolute;left:2.5px;top:13px;width:8px;height:8px;border-radius:50%;
+    background:var(--panel);box-shadow:inset 0 0 0 1.5px var(--line-strong)}
+  .tl-row:hover .tl-line::after{box-shadow:inset 0 0 0 1.5px var(--accent)}
+  .tl-row:last-child .tl-line::before{display:none}
+  .tl-body{flex:1;max-width:660px;padding-bottom:12px}
+  .tl-body .card{cursor:default}
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)}
+
+  /* ---------- 聚合视图（周 / 月） ---------- */
+  .agg{display:block}
+  .panel{background:var(--panel);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px}
+  .panel h3{margin:0 0 14px;font-size:12.5px;font-weight:600;color:var(--text-2);
+    display:flex;align-items:center;gap:8px}
+  .panel h3 svg.i{color:var(--muted)}
+  .panel h3 small{margin-left:auto;font-weight:400;color:var(--muted);font-size:11.5px;
+    font-variant-numeric:tabular-nums}
+  .agg-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .agg-row:last-child{margin-bottom:0}
+  .agg-name{flex:0 0 138px;font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:7px}
+  .agg-bar{flex:1;height:9px;background:#eef0f3;border-radius:3px;overflow:hidden}
+  .agg-bar i{display:block;height:100%;border-radius:3px;transition:width .34s var(--ease-out)}
+  .agg-num{flex:0 0 92px;text-align:right;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .daybars{display:flex;align-items:flex-end;gap:3px;margin-top:2px}
+  .daybar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;
+    height:118px;cursor:pointer;border-radius:6px;padding:3px 1px;
+    transition:background .14s var(--ease-out)}
+  .daybar:hover{background:#f2f5ff}
+  .daybar .vv{font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-2)}
+  .daybar .bar{width:100%;max-width:22px;border-radius:2px;min-height:2px;
+    transition:height .34s var(--ease-out)}
+  .daybar .lb{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .daybar.today .lb{color:var(--accent);font-weight:600}
+  .daybar.today .bar{outline:1px solid #bcd2ff;outline-offset:1px}
+
+  /* ---------- 分类选择（触屏改分类） ---------- */
+  #catPicker{position:fixed;inset:0;z-index:80;background:rgba(20,24,30,.38);
+    display:flex;align-items:center;justify-content:center;padding:18px;
+    animation:toast-in .16s var(--ease-out)}
+  .picker-panel{background:var(--panel);border-radius:14px;padding:8px;width:min(330px,94vw);
+    max-height:78vh;overflow:auto;box-shadow:0 24px 60px -12px rgba(16,24,40,.34)}
+  .picker-title{font-size:11.5px;color:var(--muted);padding:6px 10px 8px}
+  .picker-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:9px;
+    cursor:pointer;font-size:14px;border:0;background:transparent;width:100%;text-align:left;
+    color:var(--text)}
+  .picker-item:hover,.picker-item:active{background:#f2f5ff}
+  .picker-item .swatch{width:8px;height:8px}
+  .picker-item .now{margin-left:auto;font-size:11px;color:var(--accent);font-weight:600}
+
+  /* ---------- 弹窗 ---------- */
+  dialog{border:1px solid var(--line);border-radius:14px;padding:0;width:min(680px,94vw);
+    box-shadow:0 24px 60px -12px rgba(16,24,40,.3)}
+  dialog::backdrop{background:rgba(20,24,30,.4)}
+  .dlg-head{display:flex;align-items:center;gap:8px;padding:15px 18px;border-bottom:1px solid var(--line);
+    font-weight:600;font-size:13.5px;color:var(--text-2)}
+  .dlg-body{padding:18px;max-height:66vh;overflow:auto}
+  .dlg-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--line);
+    background:#fafbfc;border-radius:0 0 14px 14px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .field input[type=text],.field input[type=password]{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-family:inherit;
+    font-size:13px;background:#fff;color:var(--text)}
+  .field input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  .row{display:flex;gap:10px;align-items:center}
+  .row > *{flex:1}
+  .row > .fixed{flex:0 0 auto}
+  .note{font-size:12px;color:var(--muted);background:#f7f8fa;border-radius:9px;padding:10px 12px;line-height:1.6}
+  .note a{color:var(--accent)}
+  .cat-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+  .cat-row input[type=text]{border:1px solid var(--line);border-radius:8px;padding:5px 8px;
+    font-family:inherit;font-size:12.5px;background:#fff;color:var(--text)}
+  .cat-row input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  .cat-row input.emoji{flex:0 0 44px;text-align:center}
+  .cat-row input.name{flex:0 0 128px}
+  .cat-row input.keys{flex:1;min-width:110px}
+  .cat-row input[type=color]{flex:0 0 34px;height:30px;padding:0;border:1px solid var(--line);
+    border-radius:8px;background:#fff}
+  h4{margin:20px 0 10px;font-size:12.5px;font-weight:600;color:var(--text-2)}
+  .switch{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text)}
+  .switch input{width:auto;flex:0 0 auto;accent-color:var(--accent)}
+  .status-line{font-size:12px;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
+
+  /* ---------- toast ---------- */
+  #toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:99}
+  .toast{background:#23282f;color:#fff;border-radius:10px;padding:9px 13px;font-size:12.5px;
+    box-shadow:0 10px 30px -8px rgba(16,24,40,.4);max-width:330px;animation:toast-in .3s var(--ease-out)}
+  .toast.err{background:#a8322d}
+  .toast.ok{background:#1c6f47}
+  @keyframes toast-in{from{opacity:0;transform:translateY(8px);filter:blur(3px)}to{opacity:1;transform:none;filter:blur(0)}}
+  .hidden{display:none !important}
+
+  /* ---------- 触屏：没有 hover，操作按钮必须常显 ---------- */
+  @media (hover:none){
+    .card .ops{opacity:1}
+    .card{cursor:default}
+    .card .ops button{padding:5px 7px}
+  }
+  @media (max-width:860px){
+    .app{padding:14px 14px 48px}
+    .hint{display:none}
+    .col{flex-basis:200px}
+    .agg-name{flex-basis:104px}
+    .agg-num{flex-basis:74px}
+    .date-nav .label{min-width:132px}
+    .topbar{gap:8px}
+  }
+  @media (max-width:560px){
+    /* 手机上把输入区改成上下两行，避免长提示把输入框挤没 */
+    .composer{flex-direction:column;align-items:stretch}
+    .composer .side{flex-direction:row;align-items:center;justify-content:space-between}
+    .composer textarea{min-height:52px}
+    .topbar .row.fixed button{padding:6px 9px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand"><svg class="i lg" data-i="board"></svg>今日流水<small>想到啥就写啥，自动归类</small></div>
+    <div class="spacer"></div>
+
+    <div class="date-nav">
+      <button id="prevDay" title="上一个区间" aria-label="上一个区间"><svg class="i" data-i="left"></svg></button>
+      <div class="label" id="dayLabel">—</div>
+      <button id="nextDay" title="下一个区间" aria-label="下一个区间"><svg class="i" data-i="right"></svg></button>
+      <button class="ghost" id="todayBtn">今天</button>
+    </div>
+
+    <div class="view-switch" id="viewSwitch">
+      <button data-view="board" class="active">看板</button>
+      <button data-view="timeline">时间线</button>
+      <button data-view="week">周</button>
+      <button data-view="month">月</button>
+    </div>
+
+    <div class="row fixed" style="gap:6px">
+      <button id="syncBtn" class="off" title="与 GitHub Gist 同步"><svg class="i" data-i="sync"></svg><span id="syncLabel">同步</span></button>
+      <button id="reclassifyBtn" title="把当前区间的记录重新交给 AI 归类（手动改过的不会被覆盖）"><svg class="i" data-i="sparkle"></svg>AI 归类</button>
+      <button id="exportBtn"><svg class="i" data-i="download"></svg>导出</button>
+      <button id="importBtn"><svg class="i" data-i="upload"></svg>导入</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <button id="settingsBtn"><svg class="i" data-i="sliders"></svg>设置</button>
+    </div>
+  </div>
+
+  <div class="composer">
+    <textarea id="input" rows="2" placeholder="想到什么就写下来…"></textarea>
+    <div class="side">
+      <button class="primary" id="addBtn">记下 <kbd style="background:rgba(255,255,255,.18);border:0;padding:0 4px;border-radius:4px;font-size:10.5px">⏎</kbd></button>
+      <span class="ai-state" id="aiState"></span>
+    </div>
+  </div>
+  <div class="hint">
+    <span><kbd>⏎</kbd> 提交</span>
+    <span><kbd>Shift</kbd>+<kbd>⏎</kbd> 换行</span>
+    <span>多行一起粘贴＝一次记多条</span>
+    <span>拖拽卡片改分类（手机上点卡片上的标签按钮）</span>
+    <span>双击卡片可改文字</span>
+  </div>
+
+  <div id="summaryBox"></div>
+
+  <div class="stats" id="stats"></div>
+
+  <section id="boardView" class="board"></section>
+  <section id="timelineView" class="timeline hidden"></section>
+  <section id="aggView" class="agg hidden"></section>
+</div>
+
+<div id="catPicker" class="hidden"></div>
+
+<dialog id="settingsDialog">
+  <div class="dlg-head"><svg class="i lg" data-i="sliders"></svg>设置</div>
+  <div class="dlg-body">
+    <h4 style="margin-top:0">云同步（GitHub Gist）</h4>
+    <div class="field">
+      <label>GitHub Token（只勾 Gists 权限即可，免费）</label>
+      <div class="row">
+        <input type="password" id="setToken" placeholder="github_pat_... 或 ghp_...">
+        <button class="fixed" id="toggleToken" type="button">显示</button>
+      </div>
+    </div>
+    <div class="field switch">
+      <input type="checkbox" id="setAutoSync">
+      <label for="setAutoSync" style="margin:0">改动后自动同步（关掉则只在你点「同步」时同步）</label>
+    </div>
+    <div class="field row">
+      <button id="syncNowBtn" class="fixed" type="button"><svg class="i sm" data-i="sync"></svg>立即同步</button>
+      <span id="syncResult" style="font-size:12px;color:var(--muted);flex:2"></span>
+    </div>
+    <div class="note" id="syncNote">
+      记录会存进你账号下的一个<b>私有 Gist</b>，手机和电脑读同一份。<br>
+      Token 只存在本机浏览器里（明文），只勾 Gists 权限最安全，随时可在 GitHub 撤销。
+    </div>
+
+    <h4>AI 自动归类与小结</h4>
+    <div class="field">
+      <label>接口地址（完整 URL，OpenAI 兼容的 chat/completions）</label>
+      <input type="text" id="setUrl" placeholder="https://api.deepseek.com/chat/completions">
+    </div>
+    <div class="field">
+      <label>模型</label>
+      <input type="text" id="setModel" placeholder="deepseek-chat">
+    </div>
+    <div class="field">
+      <label>API Key</label>
+      <div class="row">
+        <input type="password" id="setKey" placeholder="sk-...">
+        <button class="fixed" id="toggleKey" type="button">显示</button>
+      </div>
+    </div>
+    <div class="field switch">
+      <input type="checkbox" id="setAutoAI">
+      <label for="setAutoAI" style="margin:0">记下一条就自动调 AI 归类（关掉则只用本地关键词规则）</label>
+    </div>
+    <div class="field row">
+      <button id="testApiBtn" class="fixed" type="button">测试连接</button>
+      <span id="testApiResult" style="font-size:12px;color:var(--muted);flex:2"></span>
+    </div>
+
+    <h4>分类</h4>
+    <div class="note" style="margin-bottom:12px">
+      改完点右下角「保存」。关键词用于没有 AI 时的本地兜底（英文逗号分隔）。分类 id 保持不变，历史记录不会丢。
+    </div>
+    <div id="catEditor"></div>
+    <button id="addCatBtn" type="button" style="margin-top:8px"><svg class="i sm" data-i="plus"></svg>新增分类</button>
+  </div>
+  <div class="dlg-foot">
+    <button id="resetCatsBtn">恢复默认分类</button>
+    <div class="spacer"></div>
+    <button id="cancelSettings">取消</button>
+    <button class="primary" id="saveSettings">保存</button>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   今日流水 · 单文件版
+   数据：localStorage（本地优先）+ GitHub Gist（跨设备同步）
+   归类：本地关键词规则 + AI（OpenAI 兼容）覆盖
+   视图：看板 / 时间线 / 周 / 月
+   ============================================================ */
+
+const STORE_KEY = 'taskflow.v1';
+const SETTINGS_KEY = 'taskflow.settings.v1';
+const GIST_API = 'https://api.github.com/gists';
+const GIST_FILE = 'taskflow-data.json';
+
+/* ---------- 图标：一套描边与粗细，不用 emoji 充当功能图标 ---------- */
+const ICON = {
+  board:   '<path d="M4.5 5.5h15v13h-15z"/><path d="M9.7 5.5v13M14.3 5.5v13"/>',
+  left:    '<path d="M14 6.5L8.5 12l5.5 5.5"/>',
+  right:   '<path d="M10 6.5l5.5 5.5L10 17.5"/>',
+  sync:    '<path d="M20.4 11.2a8.4 8.4 0 00-14.7-4.7L3.6 8.6"/><path d="M3.6 4.2v4.4h4.4"/><path d="M3.6 12.8a8.4 8.4 0 0014.7 4.7l2.1-2.1"/><path d="M20.4 19.8v-4.4h-4.4"/>',
+  sparkle: '<path d="M10.6 3.4l1.6 4.3a3 3 0 001.7 1.7l4.3 1.6-4.3 1.6a3 3 0 00-1.7 1.7l-1.6 4.3-1.6-4.3a3 3 0 00-1.7-1.7L3 11l4.3-1.6a3 3 0 001.7-1.7z"/><path d="M18.3 15.4l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/>',
+  download:'<path d="M12 4.2v10.4"/><path d="M7.6 10.5L12 14.9l4.4-4.4"/><path d="M4.6 19.6h14.8"/>',
+  upload:  '<path d="M12 19.8V9.4"/><path d="M7.6 13.7L12 9.3l4.4 4.4"/><path d="M4.6 4.4h14.8"/>',
+  sliders: '<path d="M5 20.2v-5.4M5 10.6V3.8M12 20.2v-7.6M12 8.4V3.8M19 20.2v-3.6M19 12.2V3.8"/><path d="M2.6 14.8h4.8M9.6 8.4h4.8M16.6 16.6h4.8"/>',
+  note:    '<path d="M15.8 3.4H5.4a2 2 0 00-2 2v13.2a2 2 0 002 2h8.4l6-6V5.4a2 2 0 00-2-2z"/><path d="M14.8 20.6v-3.8a2 2 0 012-2h3.8"/>',
+  layers:  '<path d="M12 3.4l8 4.1-8 4.1-8-4.1z"/><path d="M4 12.1l8 4.1 8-4.1"/><path d="M4 16.3l8 4.1 8-4.1"/>',
+  calendar:'<path d="M5 5.6h14a1.4 1.4 0 011.4 1.4v11.6a1.4 1.4 0 01-1.4 1.4H5a1.4 1.4 0 01-1.4-1.4V7A1.4 1.4 0 015 5.6z"/><path d="M3.6 10.2h16.8"/><path d="M8 3.6v4M16 3.6v4"/>',
+  check:   '<path d="M12 3.6a8.4 8.4 0 100 16.8 8.4 8.4 0 000-16.8z"/><path d="M8.3 12.2l2.5 2.5 4.9-5.2"/>',
+  pencil:  '<path d="M4.6 19.4h3.8L19 8.8a2.4 2.4 0 00-3.4-3.4L4.6 15.6z"/><path d="M13.8 7.2l3.2 3.2"/>',
+  tag:     '<path d="M11.6 3.6H5.4a1.8 1.8 0 00-1.8 1.8v6.2l9.2 9.2a1.8 1.8 0 002.5 0l5.4-5.4a1.8 1.8 0 000-2.5z"/><path d="M8.2 8.2h.01"/>',
+  x:       '<path d="M6.6 6.6l10.8 10.8M17.4 6.6L6.6 17.4"/>',
+  plus:    '<path d="M12 5.6v12.8M5.6 12h12.8"/>'
+};
+function icon(name, cls){
+  return '<svg class="i' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" aria-hidden="true">'
+    + (ICON[name] || '') + '</svg>';
+}
+function paintStaticIcons(){
+  $$('svg[data-i]').forEach(svg => {
+    if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', '0 0 24 24');
+    svg.innerHTML = ICON[svg.getAttribute('data-i')] || '';
+  });
+}
+
+/* ---------- 默认分类（科研向 + 公考 + 找工作） ---------- */
+const DEFAULT_CATEGORIES = [
+  { id:'lit',   name:'文献阅读',     emoji:'📚', color:'#5b8def',
+    keys:['文献','论文','读','paper','综述','引用','pdf','下载','笔记','ref','zotero','reading'] },
+  { id:'write', name:'写作与修改',   emoji:'✍️', color:'#e0745f',
+    keys:['写','改','润色','投稿','返修','审稿','回复','abstract','response','稿','章节','摘要','rebuttal','proof','批注'] },
+  { id:'exp',   name:'实验与分析',   emoji:'🔬', color:'#3fae8f',
+    keys:['tima','xrd','锆石','金红石','u-pb','定年','样品','实验','磨片','镜下','测','分析','sem','eds','拉曼','主量','微量'] },
+  { id:'data',  name:'数据处理与制图', emoji:'📊', color:'#b28be0',
+    keys:['数据','统计','画图','制图','图','origin','excel','python','arcgis','处理','表格','绘图','拟合','聚类'] },
+  { id:'tool',  name:'工具与 AI',    emoji:'🤖', color:'#d9a02b',
+    keys:['skill','ai','claude','gpt','prompt','脚本','配置','安装','插件','代码','code','网页','工具','api','模型'] },
+  { id:'admin', name:'事务沟通',     emoji:'📮', color:'#5aa7c4',
+    keys:['邮件','导师','组会','报销','助教','联系','电话','开会','会议','通知','签字','交表','填表','发票'] },
+  { id:'exam',  name:'公考',         emoji:'📝', color:'#c85f8a',
+    keys:['行测','申论','刷题','公考','省考','国考','事业单位','时政','常识','模考','错题','题本','面试班'] },
+  { id:'job',   name:'找工作',       emoji:'💼', color:'#7f9440',
+    keys:['简历','投递','面试','offer','招聘','网申','笔试','hr','岗位','猎头','宣讲','双选会','求职'] },
+  { id:'misc',  name:'杂事',         emoji:'🧩', color:'#8b8f9a',
+    keys:['快递','买','收拾','休息','锻炼','跑步','看病','吃饭','睡觉','散步','缴费','取'] },
+];
+const UNCATEGORIZED = { id:'uncat', name:'未分类', emoji:'❓', color:'#9aa0a6', keys:[] };
+
+const DEFAULT_SETTINGS = {
+  apiUrl: 'https://api.deepseek.com/chat/completions',
+  model: 'deepseek-chat',
+  apiKey: '',
+  autoAI: true,
+  view: 'board',
+  gistToken: '',
+  gistId: '',
+  gistHtmlUrl: '',
+  autoSync: true,
+  categoriesUpdatedAt: '',
+};
+
+/* ---------- 小工具 ---------- */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const uid = () => (window.crypto && crypto.randomUUID)
+  ? crypto.randomUUID()
+  : 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dayOf(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+function todayStr(){ return dayOf(new Date()); }
+function hhmm(iso){ const d = new Date(iso); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+function shiftDay(str, delta){
+  const [y,m,d] = str.split('-').map(Number);
+  return dayOf(new Date(y, m-1, d + delta));
+}
+const WEEK = ['周日','周一','周二','周三','周四','周五','周六'];
+function parseDay(str){ const [y,m,d] = str.split('-').map(Number); return new Date(y, m-1, d); }
+
+/* ---------- 区间计算（周一起算 / 自然月） ---------- */
+function startOfWeek(str){
+  const dt = parseDay(str);
+  const dow = (dt.getDay() + 6) % 7;
+  return dayOf(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - dow));
+}
+function endOfWeek(str){ return shiftDay(startOfWeek(str), 6); }
+function startOfMonth(str){ return str.slice(0, 8) + '01'; }
+function endOfMonth(str){
+  const [y,m] = str.split('-').map(Number);
+  return dayOf(new Date(y, m, 0));
+}
+function shiftMonth(str, delta){
+  const [y,m] = str.split('-').map(Number);
+  return dayOf(new Date(y, m - 1 + delta, 1));
+}
+function rangeDays(from, to){
+  const out = []; let cur = from;
+  while (cur <= to){ out.push(cur); cur = shiftDay(cur, 1); }
+  return out;
+}
+function currentRange(){
+  const v = state.settings.view, d = state.viewDate;
+  if (v === 'week')  return { from: startOfWeek(d),  to: endOfWeek(d),   kind: 'week'  };
+  if (v === 'month') return { from: startOfMonth(d), to: endOfMonth(d),  kind: 'month' };
+  return { from: d, to: d, kind: 'day' };
+}
+
+let toastSeq = 0;
+function toast(msg, kind){
+  // 同类提示只留最新一条，避免手机屏幕上堆叠
+  const id = ++toastSeq;
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.dataset.seq = id;
+  el.textContent = msg;
+  const box = $('#toast');
+  box.querySelectorAll('.toast').forEach(t => { if (box.querySelectorAll('.toast').length > 2) t.remove(); });
+  box.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = '.3s'; }, 2600);
+  setTimeout(() => el.remove(), 3100);
+}
+
+/* ============================================================
+   状态与持久化
+   ============================================================ */
+const state = {
+  items: [],
+  categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+  summaries: {},
+  settings: Object.assign({}, DEFAULT_SETTINGS),
+  viewDate: todayStr(),
+  freshIds: new Set(),
+  syncStatus: 'off',        // off | syncing | ok | error
+  syncMessage: '',
+  pickerItemId: null,
+};
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw){
+      const d = JSON.parse(raw);
+      if (Array.isArray(d.items)) state.items = d.items;
+      if (Array.isArray(d.categories) && d.categories.length) state.categories = d.categories;
+      if (d.summaries && typeof d.summaries === 'object') state.summaries = d.summaries;
+    }
+  }catch(e){ console.warn('读取本地数据失败', e); }
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) Object.assign(state.settings, JSON.parse(raw));
+  }catch(e){ console.warn('读取设置失败', e); }
+}
+function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      items: state.items, categories: state.categories, summaries: state.summaries,
+    }));
+  }catch(e){
+    toast('保存失败：浏览器存储可能已满或被禁用', 'err');
+  }
+}
+function saveSettings(){
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); }catch(e){}
+}
+
+function allCats(){ return state.categories.concat([UNCATEGORIZED]); }
+function catById(id){ return allCats().find(c => c.id === id) || UNCATEGORIZED; }
+
+/* ============================================================
+   本地关键词规则（AI 的兜底）
+   ============================================================ */
+function classifyByRules(text){
+  const t = String(text).toLowerCase();
+  let best = null, bestScore = 0;
+  for (const c of state.categories){
+    let score = 0;
+    for (const k of (c.keys || [])){
+      if (k && t.includes(String(k).toLowerCase())) score += Math.max(1, String(k).length);
+    }
+    if (score > bestScore){ bestScore = score; best = c.id; }
+  }
+  return bestScore > 0 ? best : UNCATEGORIZED.id;
+}
+
+/* ============================================================
+   AI 调用（OpenAI 兼容）
+   ============================================================ */
+function aiReady(){
+  return !!(state.settings.apiKey && state.settings.apiUrl && state.settings.model);
+}
+
+async function callChat(messages, timeoutMs){
+  const s = state.settings;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 45000);
+  try{
+    const res = await fetch(s.apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.apiKey },
+      body: JSON.stringify({ model: s.model, temperature: 0, messages }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok){
+      let detail = '';
+      try{ detail = (await res.text()).slice(0, 200); }catch(e){}
+      throw new Error('HTTP ' + res.status + ' ' + detail);
+    }
+    const data = await res.json();
+    const content = data && data.choices && data.choices[0]
+      && data.choices[0].message && data.choices[0].message.content;
+    if (!content) throw new Error('接口没有返回内容');
+    return content;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildClassifyPrompt(){
+  const lines = state.categories.map(c =>
+    '- ' + c.id + ' ' + c.name + (c.keys && c.keys.length ? '（例如：' + c.keys.slice(0, 6).join('、') + '）' : '')
+  ).join('\n');
+  return '你是任务归类助手。把用户给出的每条事项，归入下面分类中的一个。\n'
+    + '分类列表：\n' + lines + '\n'
+    + '规则：只选一个最贴近的；实在无法判断用 "' + UNCATEGORIZED.id + '"；不要发明新分类。\n'
+    + '只输出 JSON，不要 markdown 代码块，不要解释，格式：{"items":[{"id":"原样返回的id","category":"分类id"}]}';
+}
+
+function extractJson(s){
+  let t = String(s).trim();
+  t = t.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const i = t.indexOf('{'), j = t.lastIndexOf('}');
+  if (i === -1 || j === -1 || j < i) throw new Error('返回内容不是 JSON');
+  return JSON.parse(t.slice(i, j + 1));
+}
+
+async function callAI(pairs, timeoutMs){
+  const content = await callChat([
+    { role: 'system', content: buildClassifyPrompt() },
+    { role: 'user', content: JSON.stringify(pairs) },
+  ], timeoutMs);
+  const parsed = extractJson(content);
+  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  const valid = new Set(state.categories.map(c => c.id));
+  const out = {};
+  for (const it of items){
+    if (!it || !it.id) continue;
+    out[String(it.id)] = valid.has(it.category) ? it.category : UNCATEGORIZED.id;
+  }
+  return out;
+}
+
+const aiQueue = new Set();
+let aiTimer = null;
+let aiBusy = false;
+
+function scheduleAI(items){
+  items.forEach(it => aiQueue.add(it.id));
+  if (aiTimer) clearTimeout(aiTimer);
+  aiTimer = setTimeout(flushAI, 500);
+}
+
+async function flushAI(){
+  if (!aiReady() || aiQueue.size === 0) return;
+  if (aiBusy){ if (aiTimer) clearTimeout(aiTimer); aiTimer = setTimeout(flushAI, 800); return; }
+  const ids = Array.from(aiQueue);
+  aiQueue.clear();
+  const pairs = ids
+    .map(id => state.items.find(i => i.id === id))
+    .filter(Boolean)
+    .map(it => ({ id: it.id, text: it.text }));
+  if (!pairs.length) return;
+
+  aiBusy = true;
+  setAiState('AI 归类中…');
+  try{
+    const map = await callAI(pairs, 45000);
+    let changed = 0;
+    for (const it of state.items){
+      const target = map[it.id];
+      if (!target) continue;
+      if (it.source === 'manual') continue;
+      if (it.category !== target){ it.category = target; changed++; }
+      it.source = 'ai';
+      it.updatedAt = new Date().toISOString();
+    }
+    save();
+    render();
+    if (changed) scheduleSync();
+    setAiState(changed ? 'AI 归好了 ' + changed + ' 条' : 'AI 看过，无需改动');
+    setTimeout(() => setAiState(''), 2500);
+  }catch(e){
+    console.warn('AI 归类失败', e);
+    setAiState('AI 不可用，已用本地规则兜底');
+    toast('AI 归类失败：' + (e && e.message ? e.message : e) + '（已保留本地规则结果）', 'err');
+  } finally {
+    aiBusy = false;
+    if (aiQueue.size) { if (aiTimer) clearTimeout(aiTimer); aiTimer = setTimeout(flushAI, 300); }
+  }
+}
+
+function setAiState(txt){ $('#aiState').textContent = txt || ''; }
+
+/* ============================================================
+   云同步（GitHub Gist）
+   本地优先：断网照记，联网时双向合并
+   ============================================================ */
+function syncReady(){ return !!state.settings.gistToken; }
+
+async function gistRequest(url, opts){
+  opts = opts || {};
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': 'Bearer ' + state.settings.gistToken,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      body: opts.body,
+      signal: ctrl.signal,
+    });
+    if (!res.ok){
+      let detail = '';
+      try{ detail = (await res.text()).slice(0, 300); }catch(e){}
+      throw new Error('HTTP ' + res.status + ' ' + detail);
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildPayload(){
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    categoriesUpdatedAt: state.settings.categoriesUpdatedAt || '',
+    categories: state.categories,
+    summaries: state.summaries,
+    items: state.items,
+  };
+}
+
+/* 读云端的 payload：列表接口返回的 gist 可能不带 content，那就再取一次单个 */
+async function readGistPayload(gist, gistId){
+  let g = gist;
+  const hasContent = g && g.files && g.files[GIST_FILE] && typeof g.files[GIST_FILE].content === 'string';
+  if (!hasContent && gistId) g = await gistRequest(GIST_API + '/' + gistId);
+  const content = g && g.files && g.files[GIST_FILE] && g.files[GIST_FILE].content;
+  if (typeof content !== 'string') return null;
+  try{ return JSON.parse(content); }
+  catch(e){ console.warn('云端数据解析失败，按空处理', e); return null; }
+}
+
+/* 同一 id 取 updatedAt 较新的；远端独有的直接收下。
+   删除用墓碑（deleted:true）表示，所以「另一台删掉的」不会被本地旧记录复活。 */
+function mergeItems(localArr, remoteArr){
+  const map = new Map();
+  for (const it of localArr || []) map.set(it.id, it);
+  for (const it of remoteArr || []){
+    if (!it || !it.id) continue;
+    const cur = map.get(it.id);
+    if (!cur || String(it.updatedAt || '') > String(cur.updatedAt || '')) map.set(it.id, it);
+  }
+  return Array.from(map.values());
+}
+
+function applyPayload(remote){
+  if (!remote || typeof remote !== 'object') return;
+  state.items = mergeItems(state.items, remote.items);
+
+  const remoteCatAt = remote.categoriesUpdatedAt || '';
+  const localCatAt = state.settings.categoriesUpdatedAt || '';
+  if (Array.isArray(remote.categories) && remote.categories.length && remoteCatAt > localCatAt){
+    state.categories = remote.categories;
+    state.settings.categoriesUpdatedAt = remoteCatAt;
+  }
+
+  if (remote.summaries && typeof remote.summaries === 'object'){
+    for (const k of Object.keys(remote.summaries)){
+      const r = remote.summaries[k], l = state.summaries[k];
+      if (!r) continue;
+      if (!l || String(r.at || '') > String(l.at || '')) state.summaries[k] = r;
+    }
+  }
+}
+
+function setSyncStatus(status, message){
+  state.syncStatus = status;
+  state.syncMessage = message || '';
+  renderSyncBtn();
+}
+
+function renderSyncBtn(){
+  const btn = $('#syncBtn');
+  if (!btn) return;
+  const s = state.syncStatus;
+  btn.classList.remove('off', 'syncing', 'ok', 'error');
+  btn.classList.add(s);
+  const label = { off:'同步', syncing:'同步中', ok:'已同步', error:'同步失败' }[s] || '同步';
+  $('#syncLabel').textContent = label;
+  let tip = state.syncMessage;
+  if (!tip){
+    tip = s === 'off' ? (syncReady() ? '点这里与云端同步' : '还没填 GitHub Token，点这里去设置')
+      : (s === 'ok' ? '已与云端同步' : '');
+  }
+  btn.title = tip;
+}
+
+async function syncNow(silent){
+  if (!syncReady()){
+    if (!silent) toast('先在设置里填 GitHub Token', 'err');
+    setSyncStatus('off');
+    return;
+  }
+  if (state.syncStatus === 'syncing') return;
+  setSyncStatus('syncing');
+  const backup = $('#syncResult');
+  if (backup && !silent) backup.textContent = '正在同步…';
+  try{
+    let gistId = state.settings.gistId;
+    let url = '';
+    let remote = null;
+
+    if (!gistId){
+      // 找一下账号下已有的同步用 gist，避免在多台设备上各建一个
+      const list = await gistRequest(GIST_API + '?per_page=100');
+      const found = (Array.isArray(list) ? list : []).find(g => g && g.files && g.files[GIST_FILE]);
+      if (found){ gistId = found.id; url = found.html_url || ''; remote = await readGistPayload(found, gistId); }
+    } else {
+      const g = await gistRequest(GIST_API + '/' + gistId);
+      url = (g && g.html_url) || state.settings.gistHtmlUrl || '';
+      remote = await readGistPayload(g, gistId);
+    }
+    // 关键：第一次挂到已有 gist 上时也必须先合并云端内容，否则本地会覆盖远端
+    if (remote) applyPayload(remote);
+
+    const body = JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(buildPayload(), null, 1) } } });
+    let saved;
+    if (gistId){
+      saved = await gistRequest(GIST_API + '/' + gistId, { method: 'PATCH', body });
+    }else{
+      saved = await gistRequest(GIST_API, {
+        method: 'POST',
+        body: JSON.stringify({
+          description: '今日流水 · 数据同步',
+          public: false,
+          files: { [GIST_FILE]: { content: JSON.parse(body).files[GIST_FILE].content } },
+        }),
+      });
+    }
+
+    state.settings.gistId = (saved && saved.id) || gistId;
+    state.settings.gistHtmlUrl = (saved && saved.html_url) || url;
+    saveSettings(); save(); render();
+
+    setSyncStatus('ok', '上次同步 ' + new Date().toLocaleTimeString('zh-CN'));
+    if (backup) backup.textContent = '同步成功 · ' + new Date().toLocaleTimeString('zh-CN');
+    if (!silent) toast('同步完成', 'ok');
+  }catch(e){
+    console.warn('同步失败', e);
+    const msg = (e && e.name === 'AbortError') ? '请求超时' : (e && e.message ? e.message : String(e));
+    setSyncStatus('error', '同步失败：' + msg);
+    if (backup) backup.textContent = '失败：' + msg;
+    if (!silent) toast('同步失败：' + msg, 'err');
+  }
+}
+
+let syncTimer = null;
+function scheduleSync(){
+  if (!syncReady() || !state.settings.autoSync) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncNow(true), 4000);
+}
+
+/* ============================================================
+   小结（当日 / 本周 / 本月）
+   ============================================================ */
+const KIND_LABEL = { day:'当日', week:'本周', month:'本月' };
+
+function liveItems(){ return state.items.filter(it => !it.deleted); }
+
+function itemsInRange(from, to){
+  return liveItems()
+    .filter(it => it.date >= from && it.date <= to)
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+function localSummary(list, kind){
+  const total = list.length;
+  const done = list.filter(i => i.status === 'done').length;
+  const counts = {};
+  for (const it of list) counts[it.category] = (counts[it.category] || 0) + 1;
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const head = KIND_LABEL[kind] || '当期';
+  let s = head + '记了 ' + total + ' 条（完成 ' + done + '）';
+  if (top.length){
+    const main = top.filter(p => p[1] >= 2).slice(0, 3);
+    if (main.length){
+      s += '，主要花在 ' + main.map(([id, n]) => catById(id).name + ' ' + n + ' 条').join('、');
+      if (top.length > main.length) s += '，其余分散在 ' + (top.length - main.length) + ' 个分类';
+    }else{
+      s += '，分布在 ' + top.length + ' 个分类，各 1 条';
+    }
+  }
+  return s + '。';
+}
+
+async function aiSummary(list, kind, from, to){
+  const payload = list.map(it => ({
+    text: it.text,
+    category: catById(it.category).name,
+    status: it.status,
+  }));
+  const sys = '你是日志总结助手。根据用户给出的任务条目，写一句中文小结，60 字以内。'
+    + '要求：点出主要投入方向与可见产出，可带数量；不要逐条罗列；不要评价、不要建议、不要寒暄、不要分点；只输出这一句话。';
+  const user = '周期：' + from + ' 至 ' + to + '（' + (KIND_LABEL[kind] || '') + '）\n'
+    + '条目（JSON）：' + JSON.stringify(payload);
+  const out = await callChat([
+    { role: 'system', content: sys },
+    { role: 'user', content: user },
+  ], 30000);
+  return String(out).trim().replace(/^["“]|["”]$/g, '');
+}
+
+function renderSummary(){
+  const { from, to, kind } = currentRange();
+  const key = kind + ':' + from;
+  const rec = state.summaries[key];
+  const rangeTxt = kind === 'day' ? from : (from + ' ~ ' + to);
+  const title = KIND_LABEL[kind] + '小结';
+
+  let body, meta = '';
+  if (rec){
+    body = '<div class="summary-body">' + esc(rec.text) + '</div>';
+    meta = '<div class="summary-meta">' + esc(rangeTxt) + ' · '
+      + (rec.source === 'ai' ? 'AI 生成' : '本地模板')
+      + ' · ' + new Date(rec.at).toLocaleString('zh-CN') + '</div>';
+  }else{
+    body = '<div class="summary-body empty">还没有小结。点右边按钮，用一句话概括'
+      + (kind === 'day' ? '这一天' : (kind === 'week' ? '这一周' : '这个月'))
+      + '干了什么。</div>';
+  }
+
+  $('#summaryBox').innerHTML = '<div class="summary">'
+    + '<div class="summary-head">' + icon('note', 'lg') + title + '<span class="spacer"></span>'
+    + '<button id="summaryBtn">' + icon('sparkle') + (rec ? '重新生成' : '生成小结') + '</button></div>'
+    + body + meta + '</div>';
+}
+
+async function generateSummary(){
+  const { from, to, kind } = currentRange();
+  const key = kind + ':' + from;
+  const list = itemsInRange(from, to);
+  if (!list.length){ toast('这个' + (kind === 'day' ? '天' : (kind === 'week' ? '周' : '个月')) + '还没有记录', ''); return; }
+
+  const btn = $('#summaryBtn');
+  if (btn){ btn.disabled = true; btn.textContent = '生成中…'; }
+
+  let text, source;
+  if (aiReady()){
+    try{
+      text = await aiSummary(list, kind, from, to);
+      source = 'ai';
+    }catch(e){
+      console.warn('AI 小结失败', e);
+      text = localSummary(list, kind);
+      source = 'local';
+      toast('AI 小结失败，已用本地模板：' + (e && e.message ? e.message : e), 'err');
+    }
+  }else{
+    text = localSummary(list, kind);
+    source = 'local';
+  }
+
+  state.summaries[key] = { text, at: new Date().toISOString(), source };
+  save();
+  renderSummary();
+  scheduleSync();
+  toast(source === 'ai' ? '小结已生成（AI）' : '小结已生成（本地模板，配 key 后可用 AI）', 'ok');
+}
+
+/* ============================================================
+   增删改
+   ============================================================ */
+function splitLines(text){
+  return String(text).split(/\r?\n/)
+    .map(s => s.replace(/^\s*[-*·•]\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function addText(text){
+  const lines = splitLines(text);
+  if (!lines.length) return;
+  const now = new Date().toISOString();
+  const created = lines.map(t => ({
+    id: uid(),
+    text: t,
+    category: classifyByRules(t),
+    source: 'rule',
+    date: todayStr(),
+    createdAt: now,
+    updatedAt: now,
+    status: 'done',
+  }));
+  state.items.push(...created);
+  state.freshIds = new Set(created.map(i => i.id));
+  save();
+  state.viewDate = todayStr();
+  if (state.settings.view === 'week' || state.settings.view === 'month') state.settings.view = 'board';
+  render();
+  toast('记下 ' + created.length + ' 条', 'ok');
+  if (state.settings.autoAI && aiReady()) scheduleAI(created);
+  else if (state.settings.autoAI && !aiReady()) toast('未配置 API Key，用的是本地关键词分类', '');
+  scheduleSync();
+}
+
+function updateItem(id, patch){
+  const it = state.items.find(i => i.id === id);
+  if (!it) return;
+  Object.assign(it, patch, { updatedAt: new Date().toISOString() });
+  save(); render(); scheduleSync();
+}
+
+/* 删除写成墓碑，好让另一台设备也知道「这条被删了」，而不是把旧记录又同步回来 */
+function removeItem(id){
+  const it = state.items.find(i => i.id === id);
+  if (!it) return;
+  if (!confirm('删除这条？\n\n' + it.text)) return;
+  const now = new Date().toISOString();
+  if (it.source === undefined) it.source = 'rule';
+  it.deleted = true;
+  it.updatedAt = now;
+  save(); render(); scheduleSync();
+  toast('已删除');
+}
+
+function cycleStatus(id){
+  const it = state.items.find(i => i.id === id);
+  if (!it) return;
+  const next = { done:'doing', doing:'dropped', dropped:'done' };
+  updateItem(id, { status: next[it.status] || 'done' });
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+function itemsOfDay(day){
+  return liveItems()
+    .filter(it => it.date === day)
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+const SOURCE_LABEL = { ai:'AI', rule:'规则', manual:'手动' };
+
+function opsHtml(){
+  return '<span class="ops">'
+    + '<button data-act="cat" title="改分类">' + icon('tag','sm') + '</button>'
+    + '<button data-act="status" title="切换状态：完成 / 进行中 / 放弃">' + icon('check','sm') + '</button>'
+    + '<button data-act="edit" title="改文字">' + icon('pencil','sm') + '</button>'
+    + '<button data-act="del" title="删除">' + icon('x','sm') + '</button>'
+    + '</span>';
+}
+
+function cardHtml(it, extraClass){
+  const fresh = state.freshIds.has(it.id) ? ' fresh' : '';
+  return '<div class="card ' + esc(it.status) + fresh + (extraClass ? ' ' + extraClass : '') + '"'
+    + ' draggable="' + (extraClass ? 'false' : 'true') + '" data-id="' + esc(it.id) + '">'
+    + '<div class="txt">' + esc(it.text) + '</div>'
+    + '<div class="meta">'
+      + '<span>' + esc(hhmm(it.createdAt)) + '</span>'
+      + '<span class="src" title="分类来源">' + esc(SOURCE_LABEL[it.source] || it.source) + '</span>'
+      + opsHtml()
+    + '</div></div>';
+}
+
+function renderStats(list, kind){
+  const counts = {};
+  for (const it of list) counts[it.category] = (counts[it.category] || 0) + 1;
+  const done = list.filter(i => i.status === 'done').length;
+  const totalLabel = kind === 'week' ? '本周' : (kind === 'month' ? '本月' : '当日');
+
+  let html = '<span class="stat-block">' + totalLabel + ' <b>' + list.length + '</b> 条</span>'
+    + '<span class="stat-block">完成 <b>' + done + '</b></span>';
+
+  if (kind !== 'day' && list.length){
+    const { from, to } = currentRange();
+    const days = rangeDays(from, to);
+    const active = new Set(list.map(i => i.date)).size;
+    html += '<span class="stat-block">活跃 <b>' + active + '/' + days.length + '</b> 天</span>'
+      + '<span class="stat-block">日均 <b>' + (list.length / days.length).toFixed(1) + '</b> 条</span>';
+  }
+
+  const chips = allCats().filter(c => counts[c.id]).map(c =>
+    '<span class="cat-chip"><i class="swatch" style="background:' + esc(c.color) + '"></i>'
+    + esc(c.emoji + ' ' + c.name) + ' <b>' + counts[c.id] + '</b></span>'
+  ).join('');
+  if (chips) html += '<span class="cat-chips">' + chips + '</span>';
+
+  $('#stats').innerHTML = html;
+}
+
+function renderBoard(dayItems){
+  const cols = [UNCATEGORIZED].concat(state.categories);
+  $('#boardView').innerHTML = cols.map(c => {
+    const list = dayItems.filter(i => i.category === c.id);
+    return '<div class="col" data-cat="' + esc(c.id) + '">'
+      + '<div class="col-head">'
+        + '<i class="swatch" style="background:' + esc(c.color) + '"></i>'
+        + '<span>' + esc(c.emoji + ' ' + c.name) + '</span>'
+        + '<span class="count">' + list.length + '</span>'
+      + '</div>'
+      + '<div class="col-body">'
+        + (list.length ? list.map(it => cardHtml(it)).join('')
+                       : '<div class="empty">' + (c.id === UNCATEGORIZED.id ? '都归好类了' : '暂无') + '</div>')
+      + '</div></div>';
+  }).join('');
+}
+
+function renderTimeline(dayItems){
+  if (!dayItems.length){
+    $('#timelineView').innerHTML = '<div class="empty" style="padding:20px 2px">这一天还没有记录</div>';
+    return;
+  }
+  const list = dayItems.slice().reverse();
+  $('#timelineView').innerHTML = list.map(it => {
+    const c = catById(it.category);
+    const fresh = state.freshIds.has(it.id) ? ' fresh' : '';
+    return '<div class="tl-row">'
+      + '<div class="tl-time">' + esc(hhmm(it.createdAt)) + '</div>'
+      + '<div class="tl-line"></div>'
+      + '<div class="tl-body">'
+        + '<div class="card ' + esc(it.status) + fresh + '" data-id="' + esc(it.id) + '">'
+          + '<div class="txt">' + esc(it.text) + '</div>'
+          + '<div class="meta">'
+            + '<span class="tag"><i class="swatch" style="background:' + esc(c.color) + '"></i>'
+              + esc(c.emoji + ' ' + c.name) + '</span>'
+            + '<span class="src">' + esc(SOURCE_LABEL[it.source] || it.source) + '</span>'
+            + opsHtml()
+          + '</div>'
+        + '</div>'
+      + '</div></div>';
+  }).join('');
+}
+
+/* ---------- 周 / 月：统计为主 ---------- */
+function renderAgg(range){
+  const { from, to, kind } = range;
+  const list = itemsInRange(from, to);
+  const days = rangeDays(from, to);
+  const today = todayStr();
+
+  const counts = {};
+  for (const it of list) counts[it.category] = (counts[it.category] || 0) + 1;
+  const maxCount = Math.max(1, ...Object.values(counts));
+  const rows = allCats().filter(c => counts[c.id]).sort((a, b) => counts[b.id] - counts[a.id]);
+
+  const perDay = {};
+  for (const d of days) perDay[d] = 0;
+  for (const it of list) if (it.date in perDay) perDay[it.date]++;
+  const dayMax = Math.max(1, ...Object.values(perDay));
+
+  const catRows = rows.length
+    ? rows.map(c => {
+        const n = counts[c.id];
+        const pct = list.length ? Math.round(n / list.length * 100) : 0;
+        return '<div class="agg-row">'
+          + '<span class="agg-name"><i class="swatch" style="background:' + esc(c.color) + '"></i>'
+            + esc(c.emoji + ' ' + c.name) + '</span>'
+          + '<span class="agg-bar"><i style="width:' + Math.round(n / maxCount * 100) + '%;background:'
+            + esc(c.color) + '"></i></span>'
+          + '<span class="agg-num">' + n + ' 条 · ' + pct + '%</span>'
+          + '</div>';
+      }).join('')
+    : '<div class="empty">这个区间还没有记录</div>';
+
+  const bars = days.map(d => {
+    const v = perDay[d];
+    const h = Math.round(v / dayMax * 78) + 2;
+    let lb = d.slice(8);
+    if (kind === 'month' && !['01','05','10','15','20','25','30'].includes(d.slice(8))) lb = '';
+    return '<div class="daybar' + (d === today ? ' today' : '') + '" data-day="' + esc(d) + '"'
+      + ' title="' + esc(d + '：' + v + ' 条') + '">'
+      + '<span class="vv">' + (v || '') + '</span>'
+      + '<span class="bar" style="height:' + h + 'px;background:' + (v ? 'var(--accent)' : '#e9ebef') + '"></span>'
+      + '<span class="lb">' + esc(lb) + '</span>'
+      + '</div>';
+  }).join('');
+
+  $('#aggView').innerHTML =
+      '<div class="panel"><h3>' + icon('layers','lg') + '各类投入</h3>' + catRows + '</div>'
+    + '<div class="panel"><h3>' + icon('calendar','lg') + '每日记录量<small>' + from + ' ~ ' + to + '</small></h3>'
+      + '<div class="daybars">' + bars + '</div></div>';
+}
+
+function dayLabelText(){
+  const v = state.settings.view, d = state.viewDate;
+  if (v === 'week'){
+    const from = startOfWeek(d), to = endOfWeek(d);
+    const isThis = from === startOfWeek(todayStr());
+    return from.slice(5) + ' ~ ' + to.slice(5) + (isThis ? ' · 本周' : '');
+  }
+  if (v === 'month'){
+    const [y, m] = d.split('-');
+    const isThis = d.slice(0, 7) === todayStr().slice(0, 7);
+    return y + ' 年 ' + Number(m) + ' 月' + (isThis ? ' · 本月' : '');
+  }
+  const tag = d === todayStr() ? ' · 今天' : (d === shiftDay(todayStr(), -1) ? ' · 昨天' : '');
+  return d + ' ' + WEEK[parseDay(d).getDay()] + tag;
+}
+
+function render(){
+  const view = state.settings.view;
+  const range = currentRange();
+  const dayItems = itemsOfDay(state.viewDate);
+
+  $('#dayLabel').textContent = dayLabelText();
+
+  if (view === 'week' || view === 'month') renderStats(itemsInRange(range.from, range.to), range.kind);
+  else renderStats(dayItems, 'day');
+
+  renderSummary();
+
+  $('#boardView').classList.toggle('hidden', view !== 'board');
+  $('#timelineView').classList.toggle('hidden', view !== 'timeline');
+  $('#aggView').classList.toggle('hidden', !(view === 'week' || view === 'month'));
+
+  if (view === 'board'){ renderBoard(dayItems); bindBoardDnD(); }
+  else if (view === 'timeline'){ renderTimeline(dayItems); }
+  else { renderAgg(range); }
+
+  $$('#viewSwitch button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  state.freshIds = new Set();
+}
+
+/* ============================================================
+   分类选择（触屏上拖拽不可用，用这个代替）
+   ============================================================ */
+function openCatPicker(id){
+  const it = state.items.find(i => i.id === id);
+  if (!it) return;
+  state.pickerItemId = id;
+  const rows = allCats().map(c =>
+    '<button class="picker-item" data-cat="' + esc(c.id) + '">'
+      + '<i class="swatch" style="background:' + esc(c.color) + '"></i>'
+      + '<span>' + esc(c.emoji + ' ' + c.name) + '</span>'
+      + (c.id === it.category ? '<span class="now">当前</span>' : '')
+    + '</button>'
+  ).join('');
+  const box = $('#catPicker');
+  box.innerHTML = '<div class="picker-panel"><div class="picker-title">把这条改到哪一类？</div>' + rows + '</div>';
+  box.classList.remove('hidden');
+}
+
+function closeCatPicker(){
+  state.pickerItemId = null;
+  $('#catPicker').classList.add('hidden');
+}
+
+$('#catPicker').addEventListener('click', e => {
+  if (e.target.id === 'catPicker'){ closeCatPicker(); return; }
+  const item = e.target.closest('.picker-item');
+  if (!item) return;
+  const id = state.pickerItemId;
+  const cat = item.dataset.cat;
+  closeCatPicker();
+  if (!id) return;
+  const it = state.items.find(i => i.id === id);
+  if (it && it.category !== cat) updateItem(id, { category: cat, source: 'manual' });
+});
+
+/* ============================================================
+   交互
+   ============================================================ */
+$('#addBtn').addEventListener('click', () => {
+  const ta = $('#input');
+  addText(ta.value);
+  ta.value = '';
+  ta.focus();
+});
+
+$('#input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    $('#addBtn').click();
+  }
+});
+
+function navigate(dir){
+  const v = state.settings.view;
+  if (v === 'week') state.viewDate = shiftDay(state.viewDate, 7 * dir);
+  else if (v === 'month') state.viewDate = shiftMonth(state.viewDate, dir);
+  else state.viewDate = shiftDay(state.viewDate, dir);
+  render();
+}
+$('#prevDay').addEventListener('click', () => navigate(-1));
+$('#nextDay').addEventListener('click', () => navigate(1));
+$('#todayBtn').addEventListener('click', () => { state.viewDate = todayStr(); render(); });
+
+$('#viewSwitch').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-view]');
+  if (!btn) return;
+  state.settings.view = btn.dataset.view;
+  if (state.settings.view === 'week' || state.settings.view === 'month') state.viewDate = todayStr();
+  saveSettings();
+  render();
+});
+
+function handleCardAction(e){
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const card = btn.closest('.card');
+  if (!card) return;
+  const id = card.dataset.id;
+  const act = btn.dataset.act;
+  const it = state.items.find(i => i.id === id);
+  if (!it) return;
+  if (act === 'del') removeItem(id);
+  else if (act === 'status') cycleStatus(id);
+  else if (act === 'cat') openCatPicker(id);
+  else if (act === 'edit'){
+    const next = prompt('修改这条内容：', it.text);
+    if (next !== null && next.trim()) updateItem(id, { text: next.trim(), source: 'manual' });
+  }
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#summaryBtn')){ generateSummary(); return; }
+  if (e.target.closest('#syncBtn')){ syncNow(false); return; }
+
+  const bar = e.target.closest('.daybar');
+  if (bar && bar.dataset.day){
+    state.viewDate = bar.dataset.day;
+    state.settings.view = 'board';
+    saveSettings(); render();
+    return;
+  }
+
+  if (e.target.closest('.card')) handleCardAction(e);
+});
+
+document.addEventListener('dblclick', e => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  if (state.settings.view !== 'board') return;
+  const it = state.items.find(i => i.id === card.dataset.id);
+  if (!it) return;
+  const next = prompt('修改这条内容：', it.text);
+  if (next !== null && next.trim()) updateItem(it.id, { text: next.trim(), source: 'manual' });
+});
+
+/* ---------- 拖拽改分类（看板，桌面端） ---------- */
+function bindBoardDnD(){
+  let dragId = null;
+  $$('#boardView .card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      dragId = card.dataset.id;
+      card.classList.add('dragging');
+      try{ e.dataTransfer.setData('text/plain', dragId); }catch(err){}
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+  });
+  $$('#boardView .col').forEach(col => {
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      col.classList.add('dragover');
+    });
+    col.addEventListener('dragleave', () => col.classList.remove('dragover'));
+    col.addEventListener('drop', e => {
+      e.preventDefault();
+      col.classList.remove('dragover');
+      const id = dragId || e.dataTransfer.getData('text/plain');
+      if (!id) return;
+      const cat = col.dataset.cat;
+      const it = state.items.find(i => i.id === id);
+      if (it && it.category !== cat) updateItem(id, { category: cat, source: 'manual' });
+    });
+  });
+}
+
+/* ---------- 重新归类（当前区间） ---------- */
+$('#reclassifyBtn').addEventListener('click', () => {
+  if (!aiReady()){ toast('先在设置里填 API Key', 'err'); return; }
+  const range = currentRange();
+  const targets = liveItems().filter(it =>
+    it.date >= range.from && it.date <= range.to && it.source !== 'manual' && it.status !== 'dropped');
+  if (!targets.length){ toast('这个区间没有可重新归类的记录（手动改过的会保留）', ''); return; }
+  targets.forEach(it => { it.source = 'rule'; });
+  scheduleAI(targets);
+  toast('已提交 ' + targets.length + ' 条给 AI 重新归类');
+});
+
+/* ---------- 导出 / 导入 ---------- */
+$('#exportBtn').addEventListener('click', () => {
+  const payload = buildPayload();
+  payload.exportedAt = payload.savedAt;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '今日流水-' + todayStr() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast('已导出 ' + liveItems().length + ' 条（含小结）', 'ok');
+});
+
+$('#importBtn').addEventListener('click', () => $('#importFile').click());
+$('#importFile').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const d = JSON.parse(reader.result);
+      const incoming = Array.isArray(d) ? d : (d.items || []);
+      if (!Array.isArray(incoming)) throw new Error('文件里没有 items 数组');
+      const before = new Set(state.items.map(i => i.id));
+      let added = 0;
+      const normalized = incoming.map(it => {
+        if (!it || !it.text) return null;
+        const id = it.id || uid();
+        if (!before.has(id)) added++;
+        return {
+          id,
+          text: String(it.text),
+          category: it.category || UNCATEGORIZED.id,
+          source: it.source || 'rule',
+          date: it.date || todayStr(),
+          createdAt: it.createdAt || new Date().toISOString(),
+          updatedAt: it.updatedAt || it.createdAt || new Date().toISOString(),
+          status: it.status || 'done',
+          deleted: !!it.deleted,
+        };
+      }).filter(Boolean);
+      state.items = mergeItems(state.items, normalized);
+      if (d.summaries && typeof d.summaries === 'object'){
+        for (const k of Object.keys(d.summaries)){
+          const r = d.summaries[k], l = state.summaries[k];
+          if (r && (!l || String(r.at || '') > String(l.at || ''))) state.summaries[k] = r;
+        }
+      }
+      if (Array.isArray(d.categories) && d.categories.length && confirm('同时导入文件里的分类设置？（会替换当前分类）')){
+        state.categories = d.categories;
+        state.settings.categoriesUpdatedAt = d.categoriesUpdatedAt || new Date().toISOString();
+      }
+      save(); render(); scheduleSync();
+      toast('导入完成，新增 ' + added + ' 条', 'ok');
+    }catch(err){
+      toast('导入失败：' + err.message, 'err');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file, 'utf-8');
+});
+
+/* ============================================================
+   设置面板
+   ============================================================ */
+const dlg = $('#settingsDialog');
+
+function openSettings(){
+  $('#setToken').value = state.settings.gistToken;
+  $('#setAutoSync').checked = !!state.settings.autoSync;
+  const out = $('#syncResult');
+  out.textContent = state.settings.gistId
+    ? '已绑定云端（' + (state.syncStatus === 'ok' ? '状态正常' : state.syncMessage || '待同步') + '）'
+    : (syncReady() ? '还没绑定，点「立即同步」会创建' : '');
+  const note = $('#syncNote');
+  note.innerHTML = '记录会存进你账号下的一个<b>私有 Gist</b>，手机和电脑读同一份。<br>'
+    + 'Token 只存在本机浏览器里（明文），只勾 Gists 权限最安全，随时可在 GitHub 撤销。'
+    + (state.settings.gistHtmlUrl
+        ? '<br>当前数据：<a href="' + esc(state.settings.gistHtmlUrl) + '" target="_blank" rel="noopener">在 GitHub 上查看</a>'
+        : '');
+
+  $('#setUrl').value = state.settings.apiUrl;
+  $('#setModel').value = state.settings.model;
+  $('#setKey').value = state.settings.apiKey;
+  $('#setAutoAI').checked = !!state.settings.autoAI;
+  $('#testApiResult').textContent = '';
+  renderCatEditor();
+  dlg.showModal();
+}
+
+function renderCatEditor(){
+  $('#catEditor').innerHTML = state.categories.map(c =>
+    '<div class="cat-row" data-id="' + esc(c.id) + '">'
+      + '<input class="emoji" type="text" data-f="emoji" value="' + esc(c.emoji || '') + '">'
+      + '<input class="name" type="text" data-f="name" value="' + esc(c.name) + '">'
+      + '<input type="color" data-f="color" value="' + esc(c.color || '#888888') + '">'
+      + '<input class="keys" type="text" data-f="keys" value="' + esc((c.keys || []).join(',')) + '" placeholder="关键词，逗号分隔">'
+      + '<button type="button" class="ghost" data-act="delcat" title="删除分类">' + icon('x','sm') + '</button>'
+    + '</div>'
+  ).join('');
+}
+
+$('#settingsBtn').addEventListener('click', openSettings);
+$('#cancelSettings').addEventListener('click', () => dlg.close());
+
+$('#toggleToken').addEventListener('click', () => {
+  const inp = $('#setToken');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  $('#toggleToken').textContent = show ? '隐藏' : '显示';
+});
+
+$('#toggleKey').addEventListener('click', () => {
+  const inp = $('#setKey');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  $('#toggleKey').textContent = show ? '隐藏' : '显示';
+});
+
+$('#syncNowBtn').addEventListener('click', () => {
+  // 用面板里当前填的值先试，免得用户忘了保存
+  state.settings.gistToken = $('#setToken').value.trim();
+  state.settings.autoSync = $('#setAutoSync').checked;
+  saveSettings();
+  renderSyncBtn();
+  syncNow(false);
+});
+
+$('#addCatBtn').addEventListener('click', () => {
+  state.categories.push({
+    id: 'c' + Date.now().toString(36),
+    name: '新分类', emoji: '🏷️', color: '#7a7f87', keys: [],
+  });
+  renderCatEditor();
+});
+
+$('#catEditor').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act="delcat"]');
+  if (!btn) return;
+  const row = btn.closest('.cat-row');
+  const id = row.dataset.id;
+  const c = state.categories.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm('删除分类「' + c.name + '」？该分类下的记录会变成未分类。')) return;
+  state.categories = state.categories.filter(x => x.id !== id);
+  const now = new Date().toISOString();
+  for (const it of state.items) if (it.category === id) { it.category = UNCATEGORIZED.id; it.source = 'rule'; it.updatedAt = now; }
+  renderCatEditor();
+});
+
+$('#resetCatsBtn').addEventListener('click', () => {
+  if (!confirm('恢复默认分类？你自定义的分类会消失，已记录的条目会重新按关键词归类。')) return;
+  state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  const now = new Date().toISOString();
+  for (const it of state.items) if (it.source !== 'manual') { it.category = classifyByRules(it.text); it.updatedAt = now; }
+  renderCatEditor();
+});
+
+$('#saveSettings').addEventListener('click', () => {
+  state.settings.gistToken = $('#setToken').value.trim();
+  state.settings.autoSync = $('#setAutoSync').checked;
+  state.settings.apiUrl = $('#setUrl').value.trim() || DEFAULT_SETTINGS.apiUrl;
+  state.settings.model = $('#setModel').value.trim() || DEFAULT_SETTINGS.model;
+  state.settings.apiKey = $('#setKey').value.trim();
+  state.settings.autoAI = $('#setAutoAI').checked;
+  $$('#catEditor .cat-row').forEach(row => {
+    const c = state.categories.find(x => x.id === row.dataset.id);
+    if (!c) return;
+    c.emoji = $('input[data-f="emoji"]', row).value.trim() || '🏷️';
+    c.name = $('input[data-f="name"]', row).value.trim() || c.id;
+    c.color = $('input[data-f="color"]', row).value || '#888888';
+    c.keys = $('input[data-f="keys"]', row).value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  });
+  state.settings.categoriesUpdatedAt = new Date().toISOString();
+  saveSettings(); save(); render();
+  dlg.close();
+  toast('设置已保存', 'ok');
+  if (aiReady()) toast('AI 归类与小结已就绪', 'ok');
+  if (state.settings.autoSync) scheduleSync();
+});
+
+$('#testApiBtn').addEventListener('click', async () => {
+  const out = $('#testApiResult');
+  const backup = { apiUrl: state.settings.apiUrl, model: state.settings.model, apiKey: state.settings.apiKey };
+  state.settings.apiUrl = $('#setUrl').value.trim();
+  state.settings.model = $('#setModel').value.trim();
+  state.settings.apiKey = $('#setKey').value.trim();
+  if (!aiReady()){
+    out.style.color = 'var(--err)';
+    out.textContent = '地址 / 模型 / Key 都要填';
+    Object.assign(state.settings, backup);
+    return;
+  }
+  out.style.color = 'var(--muted)';
+  out.textContent = '正在测试…';
+  const probeId = 'probe-1';
+  try{
+    const map = await callAI([{ id: probeId, text: '测试：读一篇关于本溪组的文献' }], 20000);
+    const c = catById(map[probeId]);
+    out.style.color = 'var(--ok)';
+    out.textContent = '连接成功 ✓ 示例被归到「' + c.emoji + ' ' + c.name + '」';
+  }catch(e){
+    out.style.color = 'var(--err)';
+    out.textContent = '失败：' + (e && e.message ? e.message : e);
+  }finally{
+    Object.assign(state.settings, backup);
+  }
+});
+
+/* ============================================================
+   启动
+   ============================================================ */
+paintStaticIcons();
+load();
+if (!state.settings.view) state.settings.view = 'board';
+state.viewDate = todayStr();
+render();
+renderSyncBtn();
+$('#input').focus();
+if (!aiReady()) setAiState('本地规则模式（设置里填 Key 可开 AI 归类与小结）');
+if (syncReady()) syncNow(true);
+window.addEventListener('online', () => { if (syncReady() && state.settings.autoSync) syncNow(true); });
+</script>
+</body>
+</html>
