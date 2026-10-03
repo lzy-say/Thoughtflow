@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>今日流水 · 自动归类</title>
+<title>Thoughtflow · 自动归类</title>
 <style>
   :root{
     --bg:#f4f5f7;
@@ -232,6 +232,8 @@
   .row > .fixed{flex:0 0 auto}
   .note{font-size:12px;color:var(--muted);background:#f7f8fa;border-radius:9px;padding:10px 12px;line-height:1.6}
   .note a{color:var(--accent)}
+  .note code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11.5px;
+    background:#eceef1;border-radius:4px;padding:0 4px;word-break:break-all}
   .cat-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
   .cat-row input[type=text]{border:1px solid var(--line);border-radius:8px;padding:5px 8px;
     font-family:inherit;font-size:12.5px;background:#fff;color:var(--text)}
@@ -286,7 +288,7 @@
 <div class="app">
 
   <div class="topbar">
-    <div class="brand"><svg class="i lg" data-i="board"></svg>今日流水<small>想到啥就写啥，自动归类</small></div>
+    <div class="brand"><svg class="i lg" data-i="board"></svg>Thoughtflow<small>想到啥就写啥，自动归类</small></div>
     <div class="spacer"></div>
 
     <div class="date-nav">
@@ -368,6 +370,15 @@
       <label>接口地址（完整 URL，OpenAI 兼容的 chat/completions）</label>
       <input type="text" id="setUrl" placeholder="https://api.deepseek.com/chat/completions">
     </div>
+    <div class="note" style="margin-bottom:14px">
+      要填<b>完整地址</b>并以 <code>/chat/completions</code> 结尾。DeepSeek 就是
+      <code>https://api.deepseek.com/chat/completions</code>。<br>
+      别填 <code>https://api.deepseek.com</code>（只到楼门口，没说是哪个窗口），也别填 Anthropic 兼容地址
+      <code>https://api.deepseek.com/anthropic</code>——那是给 Claude Code 用的，协议不同，填这里会失败。
+      <div style="margin-top:9px">
+        <button type="button" id="useDeepseek">一键填入 DeepSeek 的地址和模型</button>
+      </div>
+    </div>
     <div class="field">
       <label>模型</label>
       <input type="text" id="setModel" placeholder="deepseek-chat">
@@ -407,7 +418,7 @@
 
 <script>
 /* ============================================================
-   今日流水 · 单文件版
+   Thoughtflow · 单文件版
    数据：localStorage（本地优先）+ GitHub Gist（跨设备同步）
    归类：本地关键词规则 + AI（OpenAI 兼容）覆盖
    视图：看板 / 时间线 / 周 / 月
@@ -643,6 +654,26 @@ async function callChat(messages, timeoutMs){
   }
 }
 
+/* 把接口报错翻译成人能看懂的一句话 */
+function explainApiError(e){
+  if (e && e.name === 'AbortError') return '请求超时：检查网络，或接口地址填错了。';
+  const msg = (e && e.message) ? e.message : String(e);
+  const m = msg.match(/HTTP\s+(\d{3})/);
+  const code = m ? Number(m[1]) : 0;
+  if (code === 404) return '地址不对（404）：这个路径不存在。要填完整地址且以 /chat/completions 结尾，'
+    + '比如 https://api.deepseek.com/chat/completions。'
+    + '常见错法是只填 https://api.deepseek.com，或填了 Anthropic 兼容地址 '
+    + 'https://api.deepseek.com/anthropic（那是给 Claude Code 用的，协议不同，填这里必 404）。';
+  if (code === 401 || code === 403) return '认证失败（' + code + '）：API Key 不对、已过期，'
+    + '或者这个 Key 跟该地址不是同一家服务商。';
+  if (code === 400) return '请求被拒（400）：多半是模型名填错了。DeepSeek 用 deepseek-chat。';
+  if (code === 429) return '被限流或余额不足（429）。稍后再试或去充点额度。';
+  if (/Failed to fetch|NetworkError|load failed/i.test(msg)) {
+    return '连不上：地址可能不存在，或被浏览器跨域拦住了。确认这个地址能在浏览器里打开。';
+  }
+  return msg;
+}
+
 function buildClassifyPrompt(){
   const lines = state.categories.map(c =>
     '- ' + c.id + ' ' + c.name + (c.keys && c.keys.length ? '（例如：' + c.keys.slice(0, 6).join('、') + '）' : '')
@@ -874,7 +905,7 @@ async function syncNow(silent){
       saved = await gistRequest(GIST_API, {
         method: 'POST',
         body: JSON.stringify({
-          description: '今日流水 · 数据同步',
+          description: 'Thoughtflow · 数据同步',
           public: false,
           files: { [GIST_FILE]: { content: JSON.parse(body).files[GIST_FILE].content } },
         }),
@@ -1430,7 +1461,7 @@ $('#exportBtn').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '今日流水-' + todayStr() + '.json';
+  a.download = 'Thoughtflow-' + todayStr() + '.json';
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
@@ -1543,8 +1574,13 @@ $('#toggleKey').addEventListener('click', () => {
   $('#toggleKey').textContent = show ? '隐藏' : '显示';
 });
 
-$('#syncNowBtn').addEventListener('click', () => {
-  // 用面板里当前填的值先试，免得用户忘了保存
+$('#useDeepseek').addEventListener('click', () => {
+  $('#setUrl').value = 'https://api.deepseek.com/chat/completions';
+  $('#setModel').value = 'deepseek-chat';
+  toast('已填入，记得点右下角「保存」', 'ok');
+});
+
+$('#syncNowBtn').addEventListener('click', () => {  // 用面板里当前填的值先试，免得用户忘了保存
   state.settings.gistToken = $('#setToken').value.trim();
   state.settings.autoSync = $('#setAutoSync').checked;
   saveSettings();
@@ -1627,7 +1663,7 @@ $('#testApiBtn').addEventListener('click', async () => {
     out.textContent = '连接成功 ✓ 示例被归到「' + c.emoji + ' ' + c.name + '」';
   }catch(e){
     out.style.color = 'var(--err)';
-    out.textContent = '失败：' + (e && e.message ? e.message : e);
+    out.textContent = '失败：' + explainApiError(e);
   }finally{
     Object.assign(state.settings, backup);
   }
